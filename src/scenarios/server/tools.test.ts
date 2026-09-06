@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  buildToolsListDeterministicOrderCheck,
   buildToolsNameFormatCheck,
   toolNameFormatCheckApplies,
   ToolsListScenario,
@@ -191,5 +192,145 @@ describe('ToolsListScenario version gate', () => {
     expect(checks.find((c) => c.id === 'tools-name-format')?.status).toBe(
       'WARNING'
     );
+  });
+});
+
+describe('buildToolsListDeterministicOrderCheck', () => {
+  const names = (...ns: string[]) => ns.map((name) => ({ name }));
+
+  it('returns SUCCESS when every probe lists the same tools in the same order', () => {
+    const check = buildToolsListDeterministicOrderCheck([
+      names('a', 'b', 'c'),
+      names('a', 'b', 'c'),
+      names('a', 'b', 'c')
+    ]);
+    expect(check.id).toBe('tools-list-deterministic-order');
+    expect(check.status).toBe('SUCCESS');
+    expect(check.errorMessage).toBeUndefined();
+    expect(check.details).toEqual({
+      toolCount: 3,
+      probes: 3,
+      orders: [
+        ['a', 'b', 'c'],
+        ['a', 'b', 'c'],
+        ['a', 'b', 'c']
+      ]
+    });
+    expect(check.specReferences?.[0]?.url).toContain('2026-07-28/server/tools');
+  });
+
+  it('returns WARNING when the same tools come back in a different order', () => {
+    const check = buildToolsListDeterministicOrderCheck([
+      names('a', 'b', 'c'),
+      names('b', 'c', 'a'),
+      names('c', 'a', 'b')
+    ]);
+    expect(check.status).toBe('WARNING');
+    expect(check.errorMessage).toMatch(/different order/);
+    expect(check.errorMessage).toMatch(/index 0/);
+    expect(check.details).toMatchObject({ toolCount: 3, probes: 3 });
+    expect(check.details?.untestable).toBeUndefined();
+    expect(check.details?.orders).toEqual([
+      ['a', 'b', 'c'],
+      ['b', 'c', 'a'],
+      ['c', 'a', 'b']
+    ]);
+  });
+
+  it('flags a divergence that only appears on the last probe', () => {
+    const check = buildToolsListDeterministicOrderCheck([
+      names('a', 'b', 'c'),
+      names('a', 'b', 'c'),
+      names('a', 'c', 'b')
+    ]);
+    expect(check.status).toBe('WARNING');
+    expect(check.errorMessage).toMatch(/probe 3/);
+    expect(check.errorMessage).toMatch(/index 1/);
+  });
+
+  it('reports untestable (WARNING) when the set of tools changed between probes', () => {
+    const check = buildToolsListDeterministicOrderCheck([
+      names('a', 'b', 'c'),
+      names('a', 'b', 'd')
+    ]);
+    expect(check.status).toBe('WARNING');
+    expect(check.errorMessage).toMatch(/^Not testable: /);
+    expect(check.errorMessage).toMatch(/added: d/);
+    expect(check.errorMessage).toMatch(/removed: c/);
+    expect(check.details).toMatchObject({ untestable: true });
+  });
+
+  it('reports untestable (WARNING) when a probe returned no tools array', () => {
+    const check = buildToolsListDeterministicOrderCheck([
+      names('a', 'b'),
+      undefined
+    ]);
+    expect(check.status).toBe('WARNING');
+    expect(check.errorMessage).toMatch(/^Not testable: /);
+    expect(check.details).toMatchObject({ untestable: true });
+  });
+
+  it('reports untestable (WARNING) with fewer than two probes', () => {
+    const check = buildToolsListDeterministicOrderCheck([names('a', 'b')]);
+    expect(check.status).toBe('WARNING');
+    expect(check.errorMessage).toMatch(/^Not testable: /);
+  });
+
+  it('returns INFO when no probe saw two tools to order', () => {
+    const one = buildToolsListDeterministicOrderCheck([names('a'), names('a')]);
+    expect(one.status).toBe('INFO');
+    expect(one.errorMessage).toMatch(/nothing to compare/);
+    expect(one.details).toEqual({
+      toolCount: 1,
+      probes: 2,
+      orders: [['a'], ['a']]
+    });
+    const none = buildToolsListDeterministicOrderCheck([[], []]);
+    expect(none.status).toBe('INFO');
+  });
+
+  it('reports untestable when a probe grows from one tool to two', () => {
+    const check = buildToolsListDeterministicOrderCheck([
+      names('a'),
+      names('a', 'b')
+    ]);
+    expect(check.status).toBe('WARNING');
+    expect(check.errorMessage).toMatch(/^Not testable: /);
+    expect(check.errorMessage).toMatch(/added: b/);
+  });
+
+  it('treats a tool without a string name as one placeholder entry', () => {
+    const check = buildToolsListDeterministicOrderCheck([
+      [{ name: 'a' }, { name: 42 }],
+      [{ name: 42 }, { name: 'a' }]
+    ]);
+    expect(check.status).toBe('WARNING');
+    expect(check.errorMessage).toMatch(/different order/);
+    expect(check.details?.orders).toEqual([
+      ['a', '<tool missing name>'],
+      ['<tool missing name>', 'a']
+    ]);
+  });
+
+  it('treats duplicate names as a set change only when their multiplicity changes', () => {
+    const stable = buildToolsListDeterministicOrderCheck([
+      names('a', 'a', 'b'),
+      names('a', 'a', 'b')
+    ]);
+    expect(stable.status).toBe('SUCCESS');
+    const changed = buildToolsListDeterministicOrderCheck([
+      names('a', 'a', 'b'),
+      names('a', 'b', 'b')
+    ]);
+    expect(changed.status).toBe('WARNING');
+    expect(changed.errorMessage).toMatch(/^Not testable: /);
+  });
+
+  it('gates itself to the 2026-07-28 wire', () => {
+    const check = buildToolsListDeterministicOrderCheck([
+      names('a', 'b'),
+      names('a', 'b')
+    ]);
+    expect(check.source).toEqual({ introducedIn: '2026-07-28' });
   });
 });
