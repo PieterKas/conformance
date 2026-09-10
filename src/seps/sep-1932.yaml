@@ -33,6 +33,8 @@ requirements:
 
   - text: 'When `dpop_bound_access_tokens` is set to `true`, the authorization server MUST reject token requests from the client that do not include a valid DPoP proof'
     excluded: 'Enforcement is gated on the `dpop_bound_access_tokens` client-registration metadata (RFC 9449 §5.2), a per-client policy — not exercisable without dynamic client registration, which is out of scope for these DPoP scenarios.'
+  - text: 'For a public client, an issued refresh token is bound to the same DPoP key (RFC 9449 §5)'
+    excluded: 'Not exercisable today: the shared conformance test authorization server does not issue refresh tokens or handle the refresh_token grant, so a conformant-vs-misbehaving pair cannot be built to validate the check. Deferred until the test AS gains refresh support.'
   - text: 'Implementations MUST conform to all requirements specified in this extension'
     excluded: 'Umbrella requirement satisfied by the specific checks above; not separately observable on the wire.'
   - text: 'Implementations MUST also conform to the baseline authorization requirements'
