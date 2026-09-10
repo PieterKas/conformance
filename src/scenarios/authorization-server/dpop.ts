@@ -516,6 +516,11 @@ browser login + callback for login-gated servers.`;
       code_challenge: codeChallenge,
       code_challenge_method: 'S256'
     });
+    // RFC 8707: forward the resource parameter when supplied, aligning with the
+    // authorization-code-grant scenario (#466) so a resource-aware AS is exercised.
+    if (options.resource) {
+      params.set('resource', options.resource);
+    }
     const authorizeUrl = `${metadata.authorization_endpoint}?${params.toString()}`;
 
     const responseUrl = await this.resolveAuthorizationResponse(
@@ -634,6 +639,10 @@ browser login + callback for login-gated servers.`;
       code_verifier: codeVerifier,
       client_id: options.clientId!
     });
+    // RFC 8707: forward the resource parameter when supplied (aligns with #466).
+    if (options.resource) {
+      params.set('resource', options.resource);
+    }
     const headers: Record<string, string> = {
       'content-type': 'application/x-www-form-urlencoded'
     };
