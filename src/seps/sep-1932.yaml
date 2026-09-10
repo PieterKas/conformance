@@ -21,6 +21,7 @@ requirements:
     text: 'Authorization servers supporting DPoP MUST include the `dpop_signing_alg_values_supported` field in their Authorization Server Metadata as defined in RFC 9449 Section 5.1. This field MUST contain a JSON array listing the JWS algorithm values supported for DPoP proof JWTs'
   - check: sep-1932-as-no-none-alg
     text: 'Only asymmetric signature algorithms are permitted; the `none` algorithm MUST NOT be included'
+  # Binding mechanics are defined in RFC 9449 (§6 cnf/jkt thumbprint, §5 token_type: DPoP), which the SEP builds on rather than restating.
   - check: sep-1932-as-token-binding
     text: "When issuing a DPoP-bound access token, the authorization server MUST bind it to the client's DPoP public key by including a `cnf` claim carrying the JWK SHA-256 thumbprint (`jkt`) of that key (RFC 9449 Section 6) and MUST set the token response `token_type` to `DPoP` (RFC 9449 Section 5)"
   - check: sep-1932-asymmetric-alg-only
